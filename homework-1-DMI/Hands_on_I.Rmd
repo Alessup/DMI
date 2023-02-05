@@ -1,0 +1,892 @@
+---
+title: "HANDS ON I - DMI"
+author: "Alejandro Marco Díaz (alejandro.marco01@estudiant.upf.edu) & Yolanda Andrés  (yolanda.andres01@estudiant.upf.edu)"
+date: "Last update: `r format(Sys.time(), '%d %B, %Y')`"      
+output:
+  html_document:
+    toc: true
+    fig_caption: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+LIBRARIES
+```{r include=FALSE}
+library(dplyr)  # for data manipulation
+library(mice)
+library(ggplot2)  # creating visualizations and plots
+library(tidyverse)
+library(GGally) # extend ggplot2
+library(RColorBrewer)
+library(ggthemes) # este y el anterior para colores
+library(gridExtra) 
+library(mice)
+library(readxl)
+library(openxlsx)
+library(gridGraphics)
+library(cowplot)
+library(ComplexHeatmap)
+
+```
+
+
+# Analysis of the Heart Disease Dataset 
+Load the data from
+[here](https://raw.githubusercontent.com/jpinero/DMI_2021/main/datasets/heart_disease_dataset.csv), and the description is [here](https://raw.githubusercontent.com/jpinero/DMI_2021/main/datasets/heart_disease_description.txt). 
+The original dataset comes from [here](https://archive.ics.uci.edu/ml/datasets/Heart+Disease) and corresponds to the [processed cleveland data](https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data)
+
+
+## Perform an EDA on the dataset
+EDA (=Exploratory Data Analysis) is the analysis of datasets based on various numerical methods and graphical tools. We explore data for patterns, trends, underlying structure, deviations from the trend, anomalies and strange structures. it is a preliminary exploration of the data to better understand its characteristics, and it facilitates discovering unexpected as well as conforming the expected (especially useful in early stage of data mining).
+
+Analyse and summarize data sets.
+
+### 1. Load the Data
+We first set the working directory with ```setwd()``` in order to go to the folder where we have the downloaded data. Then, we open the data and inspect the content:
+
+
+```{r echo=TRUE, warning=FALSE}
+heart_disease_table <- read.table("./data/heart_disease_dataset.csv", header = TRUE, na.strings="?")
+# We use the function ```na.strings``` to transform the "?" (that corresponds to the missing values) into a NA value. 
+
+```
+
+
+### 2. Distinguish Attributes
+We can see that we have 308 rows and a total of 15 attributes (columns). The legend of each attribute is: 
+
+- 1) age: age in years
+
+- 2) sex: 1 = male; 0 = female
+
+- 3) cp: chest pain type
+        -- Value 1: typical angina
+        -- Value 2: atypical angina
+        -- Value 3: non-anginal pain
+        -- Value 4: asymptomatic
+- 4) trestbps: resting blood pressure (in mm Hg on admission to the 
+        hospital
+
+- 5) chol: serum cholestoral in mg/dl
+
+- 6) fbs: (fasting blood sugar > 120 mg/dl)  (1 = true; 0 = false)
+
+- 7) restecg: resting electrocardiographic results
+        -- Value 0: normal
+        -- Value 1: having ST-T wave abnormality (T wave inversions and/or ST 
+                    elevation or depression of > 0.05 mV)
+        -- Value 2: showing probable or definite left ventricular hypertrophy
+                    by Estes' criteria
+                    
+- 8) thalach: maximum heart rate achieved
+
+- 9) exang: exercise induced angina (1 = yes; 0 = no)
+
+- 10) oldpeak: ST depression induced by exercise relative to rest
+
+- 11) slope: the slope of the peak exercise ST segment
+        -- Value 1: upsloping
+        -- Value 2: flat
+        -- Value 3: downsloping
+
+- 12) ca: number of major vessels (0-3) colored by flourosopy
+
+- 13) thal: 3 = normal; 6 = fixed defect; 7 = reversable defect
+
+- 14) num: diagnosis of heart disease (angiographic disease status)
+        -- Value 0: < 50% diameter narrowing = NO disease
+        -- Value != 0: > 50% diameter narrowing = DISEASE
+
+There is another attribute, that corresponds to the Id of the patient (patient_id). This is not useful for the data analysis, so we can remove it from our data frame
+```{r}
+heart_disease_table$patient_id <- NULL
+```
+
+
+Then we calculate the summaries of the data:
+```{r}
+summary((heart_disease_table))
+```
+We can see that all the attributes are set as integer, so we change this values to the corresponding names in order to set the character values as factors, because they are categorical. We can also see that the variables ca and thal have some missing values, denoted as NA: thal has 2 NA and ca 2.
+
+We set the variables as factors
+
+```{r}
+# Change the names in the sex variable
+heart_disease_table$sex[heart_disease_table$sex == 1] <- "male"
+heart_disease_table$sex[heart_disease_table$sex == 0] <- "female"
+
+# Change the names in the cp variable
+heart_disease_table$cp[heart_disease_table$cp == 1] <- "typical angina"
+heart_disease_table$cp[heart_disease_table$cp == 2] <- "atypical angina"
+heart_disease_table$cp[heart_disease_table$cp == 3] <- "non-anginal pain"
+heart_disease_table$cp[heart_disease_table$cp == 4] <- "asymptomatic"
+
+# Change the names in the fbs variable
+heart_disease_table$fbs[heart_disease_table$fbs == 0] <- "TRUE"
+heart_disease_table$fbs[heart_disease_table$fbs == 1] <- "FALSE"
+
+# Change the names in the restecg variable
+heart_disease_table$restecg[heart_disease_table$restecg == 0] <- "normal"
+heart_disease_table$restecg[heart_disease_table$restecg == 1] <- "ST-T wave abnormality"
+heart_disease_table$restecg[heart_disease_table$restecg == 2] <- "ventricular hypertrophy"
+
+# Change the names in the exang variable
+heart_disease_table$exang[heart_disease_table$exang == 0] <- "No"
+heart_disease_table$exang[heart_disease_table$exang == 1] <- "Yes"
+
+# Change the names in the slope variable
+heart_disease_table$slope[heart_disease_table$slope == 1] <- "Upsloping"
+heart_disease_table$slope[heart_disease_table$slope == 2] <- "Flat"
+heart_disease_table$slope[heart_disease_table$slope == 3] <- "Downsloping"
+
+# Change the names in the thal variable
+heart_disease_table$thal[heart_disease_table$thal == 3] <- "Normal"
+heart_disease_table$thal[heart_disease_table$thal == 6] <- "Fixed defect"
+heart_disease_table$thal[heart_disease_table$thal == 7] <- "Reversable defect"
+
+# Change the names in the num variable
+heart_disease_table$num[heart_disease_table$num == 0] <- "No disease"
+heart_disease_table$num[heart_disease_table$num == 1] <- "Disease"
+heart_disease_table$num[heart_disease_table$num == 2] <- "Disease"
+heart_disease_table$num[heart_disease_table$num == 3] <- "Disease"
+heart_disease_table$num[heart_disease_table$num == 4] <- "Disease"
+
+```
+
+
+```{r}
+heart_disease_table$sex <- as.factor(heart_disease_table$sex)
+heart_disease_table$cp <- as.factor(heart_disease_table$cp)
+heart_disease_table$fbs <- as.factor(heart_disease_table$fbs)
+heart_disease_table$restecg <- as.factor(heart_disease_table$restecg)
+heart_disease_table$exang <- as.factor(heart_disease_table$exang)
+heart_disease_table$slope <- as.factor(heart_disease_table$slope)
+heart_disease_table$ca <- as.factor(heart_disease_table$ca)
+heart_disease_table$thal <- as.factor(heart_disease_table$thal)
+heart_disease_table$num <- as.factor(heart_disease_table$num)
+```
+
+Now we inspect the summaries again and we can see that the categorical ones are set as factors/character:
+```{r}
+summary(heart_disease_table)
+```
+We can divide this features into two different groups: quantitative and categorical:
+
+```{r}
+# Identify which columns are quantitative and which are categorical
+categorical_columns <- sapply(heart_disease_table, is.factor)
+quantitative_columns <- sapply(heart_disease_table, is.numeric)
+
+# Extract the categorical and quantitative columns
+categorical_data <- heart_disease_table[, categorical_columns]
+quantitative_data <- heart_disease_table[, quantitative_columns]
+
+```
+
+
+### 3. Missing values
+As we said before, variables ca and Thal have missing values. Before doing any analysis, we are going to impute the missing values. First, we use the ```mice``` package to get a better understanding of the pattern of missing data, with the function ```md.pattern()```
+
+```{r echo=TRUE}
+invisible(md.pattern(heart_disease_table, plot = TRUE, rotate.names = TRUE))
+```
+
+The plot tell us the number of NA's in each variable. Once we know that, we impute the missing data, by using the same package with the function ```mice()```, with the predictive mean matching pethod ("pmm"), m = 1 repetitions of the null models and random seed = 500
+
+```{r include=FALSE}
+heart_disease_table_NM <- mice(data = heart_disease_table, m = 1, method = "pmm", maxit = 50, seed = 500)
+imputed_data <- complete(heart_disease_table_NM)
+
+```
+
+Now we can see that there are not more missing values (NA's)
+```{r}
+summary(imputed_data)
+```
+
+```{r include=FALSE}
+# other way to see if the NAs were deleted. 
+cnt_na <- apply(imputed_data, 1, function(z) sum(is.na(z)))
+cnt_na
+```
+
+For the Univariate and Bivariate analysis, we should use the imputed_data table.
+
+### 4. Outliers
+Before performing the Univariate analysis, we perform and correct the outliers.
+The outliers will be in continuous variables. The first step is to detect them.
+
+```{r}
+heartd_imputed <- imputed_data
+
+ageboxplot <- ggplot(heartd_imputed, aes(y = age)) +
+  geom_boxplot(fill = "cadetblue1") +       
+  ylab ("Age\n(years)") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+cholboxplot <- ggplot(heartd_imputed, aes(y = chol)) +
+  geom_boxplot(fill = "khaki1") +       
+  ylab ("Serum cholesterol\n(mg/dl)") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+oldpeakboxplot <- ggplot(heartd_imputed, aes(y = oldpeak)) +
+  geom_boxplot(fill = "aquamarine1") +       
+  ylab ("ST depression induced by\nexercise relative to rest") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+thalachboxplot <- ggplot(heartd_imputed, aes(y = thalach)) +
+  geom_boxplot(fill = "lightpink") +       
+  ylab ("Maximum heart\nrate reached") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+trestbpsboxplot <- ggplot(heartd_imputed, aes(y = trestbps)) +
+  geom_boxplot(fill = "mediumpurple1") +       
+  ylab ("Resting blood\npressure boxplot") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+
+library(cowplot)
+
+box_plots <- list(ageboxplot, cholboxplot, oldpeakboxplot, thalachboxplot, trestbpsboxplot)
+plot_grid(plotlist = box_plots)
+
+```
+
+
+We can see that 3 features have upper outliers (4, 5, 10) while just one has lower (8). To remove them, we can do:
+
+```{r}
+continuous_variables <-  c(4, 5, 10)
+
+for (i in continuous_variables){
+  
+  data=heartd_imputed[,i]
+  quartiles <- quantile(data, probs=c(.25, .75), na.rm = FALSE)
+  IQR <- IQR(data)
+   
+  Lower <- quartiles[1] - 1.5*IQR
+  Upper <- quartiles[2] + 1.5*IQR 
+  
+  outliers <- boxplot(data, plot=FALSE)$out
+  heartd_imputed[which(heartd_imputed[,i] %in% outliers),i] <- Upper
+}
+
+data = heartd_imputed[,8]
+ 
+quartiles <- quantile(data, probs=c(.25, .75)) #, na.rm = FALSE)
+IQR <- IQR(data)# Interquartilic range 
+ 
+Lower <- quartiles[1] - 1.5*IQR
+Upper <- quartiles[2] + 1.5*IQR 
+ 
+outliers <- boxplot(data, plot = FALSE)$out # identify variable's outliers  
+heartd_imputed[which(heartd_imputed[,8] %in% outliers),8]<-Lower # the outliers values are chaged
+
+
+# boxplots again
+ageboxplot <- ggplot(heartd_imputed, aes(y = age)) +
+  geom_boxplot(fill = "cadetblue1") +       
+  ylab ("Age\n(years)") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+cholboxplot <- ggplot(heartd_imputed, aes(y = chol)) +
+  geom_boxplot(fill = "khaki1") +       
+  ylab ("Serum cholesterol\n(mg/dl)") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+oldpeakboxplot <- ggplot(heartd_imputed, aes(y = oldpeak)) +
+  geom_boxplot(fill = "aquamarine1") +       
+  ylab ("ST depression induced by\nexercise relative to rest") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+thalachboxplot <- ggplot(heartd_imputed, aes(y = thalach)) +
+  geom_boxplot(fill = "lightpink") +       
+  ylab ("Maximum heart\nrate reached") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+trestbpsboxplot <- ggplot(heartd_imputed, aes(y = trestbps)) +
+  geom_boxplot(fill = "mediumpurple1") +       
+  ylab ("Resting blood\npressure boxplot") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+box_plots <- list(ageboxplot, cholboxplot, oldpeakboxplot, thalachboxplot, trestbpsboxplot)
+plot_grid(plotlist = box_plots)
+```
+
+
+
+### 5. Univariate Analysis
+
+We will do an univariate analysis for numerical and categorical variables in the imputed_data data frame (with out missing values). For doing that, we first set the type of variables in two new variables. With this analysis we want to answer some questions as "What type of variation occurs within my variables?". We analyze each variable separately, so we want to understand and interpreter how data is distributed within a sample or population. 
+
+#### 5.1. Numerical data
+
+```{r echo=TRUE, warning=FALSE}
+numerical_attributes <- c(1, 4, 5, 8, 10)
+
+
+heartd_imputed[, numerical_attributes] %>% 
+  gather(cols, value) %>% 
+  ggplot(aes(x = value)) +
+  geom_histogram(aes(y = ..density..), fill = "palevioletred1", alpha = 0.8) +
+  geom_density(fill = "purple2", size = 0.1, alpha = 0.2) +
+  scale_x_continuous(name = "Value") +
+  scale_y_continuous(name = "Density") +
+  facet_wrap(~ cols, scales = "free") + 
+  suppressWarnings(theme_bw())
+
+
+
+```
+
+We can see that most of the continuous variables follows a normal distribution, except the values for the variable Oldpeak. 
+
+We can correlate this result with the following plots:
+
+```{r}
+
+qqplot_age <- ggplot(heartd_imputed, aes(sample = age)) +
+  geom_qq() +
+  geom_qq_line(color = "pink")+
+  ggtitle("Age") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+qqplot_chol <- ggplot(heartd_imputed, aes(sample = chol)) +
+  geom_qq() +
+  geom_qq_line(color = "pink")+
+  ggtitle("Chol") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+qqplot_trestbps <- ggplot(heartd_imputed, aes(sample = trestbps)) +
+  geom_qq() +
+  geom_qq_line(color = "pink")+
+  ggtitle("Resting blood pressure") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+qqplot_thalach <- ggplot(heartd_imputed, aes(sample = thalach)) +
+  geom_qq() +
+  geom_qq_line(color = "pink")+
+  ggtitle("Thalach") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+qqplot_oldpeak <- ggplot(heartd_imputed, aes(sample = oldpeak)) +
+  geom_qq() +
+  geom_qq_line(color = "pink")+
+  ggtitle("Oldpeak") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# we create a list to show all the graph together
+qqplots <- list(qqplot_age, qqplot_chol, qqplot_oldpeak, qqplot_trestbps, qqplot_thalach)
+
+plot_grid(plotlist = qqplots)
+
+```
+
+#### 5.2. Categorical data
+
+For categorical data we perform BAR plots:
+```{r}
+
+bar_sex<- ggplot(heartd_imputed, aes(x=sex)) +
+  geom_bar(fill = "maroon3", color = 'black', size = 0.2, alpha = 0.7) +
+  xlab("SEX") +
+  ylab("Frequency")
+
+bar_cp<- ggplot(heartd_imputed, aes(x=cp)) +
+  geom_bar(fill = "maroon3", color = 'black', size = 0.2, alpha = 0.7) +
+  xlab("chest pain") +
+  ylab("Frequency")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7))
+
+bar_fbs<- ggplot(heartd_imputed, aes(x=fbs)) +
+  geom_bar(fill = "maroon3", color = 'black', size = 0.2, alpha = 0.7) +
+  xlab("fasting blood sugar") +
+  ylab("Frequency")
+
+bar_exang<- ggplot(heartd_imputed, aes(x=exang)) +
+  geom_bar(fill = "maroon3", color = 'black', size = 0.2, alpha = 0.7) +
+  xlab("exang") +
+  ylab("Frequency")
+
+bar_slope<- ggplot(heartd_imputed, aes(x=slope)) +
+  geom_bar(fill = "maroon3", color = 'black', size = 0.2, alpha = 0.7) +
+  xlab("old peak slope") +
+  ylab("Frequency")
+
+bar_ca<- ggplot(heartd_imputed, aes(x=ca)) +
+  geom_bar(fill = "maroon3", color = 'black', size = 0.2, alpha = 0.7) +
+  xlab("major vessels coloured") +
+  ylab("Frequency")
+
+bar_thal<- ggplot(heartd_imputed, aes(x=thal)) +
+  geom_bar(fill = "maroon3", color = 'black', size = 0.2, alpha = 0.7) +
+  xlab("thalasemia") +
+  ylab("Frequency") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7))
+
+bar_num<- ggplot(heartd_imputed, aes(x=num)) +
+  geom_bar(fill = "maroon3", color = 'black', size = 0.2, alpha = 0.7) +
+  xlab("diagnosis") +
+  ylab("Frequency")
+
+
+
+bar_plots1 <- list(bar_exang, bar_fbs, bar_num)
+
+plot_grid(plotlist = bar_plots1)
+
+```
+```{r}
+bar_plots2 <- list(bar_thal, bar_ca, bar_slope, bar_cp)
+
+plot_grid(plotlist = bar_plots2)
+```
+
+
+
+
+### 6. Bivariate Analysis
+
+Once the univariate analysis of our data is finished, we will perform a bivariate analysis for compare both numerical and categorical variables against the diagnose variable ("num"). This with the aim of visualizing which are those variables that seem to be most associated with heart disease, and for this we will graphically represent the diagnostic variable combined with the rest of variables using different types of plots.
+
+#### 6.1. Diagnosis x categorical variables.
+
+# Column histogram plots #
+
+```{r echo=TRUE, warning=FALSE}
+# We put the names of the categorical variables to plot against on a list
+vars_to_plot <- c("sex", "cp", "fbs", "restecg", "exang", "slope", "ca", "thal")
+
+Barplots_2vars <- list()
+
+# Here we create an empty list to store the plots, and draw them using the following function:
+Barplots_2vars <- list()
+for (i in vars_to_plot) {
+  Barplots_2vars[[i]] <- ggplot(heartd_imputed, aes_string(x = i, fill = "num")) +
+    geom_bar(position = "dodge")
+}
+
+#New names for variables (we save them on a list for next uses)
+new_names <- c("Gender", "Chest Pain", "Fasting Blood Sugar", "Resting ECG", "Exercise Induced Angina", "Old Peak Slope", "Number of Major Vessels", "Thalassemia")
+
+#Then assign the new variable names to the barplots
+names(Barplots_2vars) <- new_names
+
+#Update the plots with new names and modify the legends
+for (i in 1:length(Barplots_2vars)) {
+Barplots_2vars[[i]] <- Barplots_2vars[[i]] + xlab(new_names[i])
+if (i != 1) {
+Barplots_2vars[[i]] <- Barplots_2vars[[i]] + theme(legend.position = "none")
+} else {
+Barplots_2vars[[i]] <- Barplots_2vars[[i]] + guides(key.height = unit(0.1, "cm"), title.position = "top", fill = guide_legend(title = NULL))
+}
+}
+
+#Finally, we show all the plots together
+plot_grid(plotlist = Barplots_2vars)
+```
+
+First sight conclusions of the "Diagnosis" x Categorical Variables comparative:
+
+  - We found a much higher disease/no disease ratio in males than in females. Likewise, 
+      we also find a notably higher number of cases of disease in male than in female.
+  - Most cases of disease turn out to be asymptomatic.
+  - Fasting blood sugar does not appear to have a direct correlation with diagnosis
+  - In the normal Resting ECGs we find a greater number of healthy patients than the ones with the disease, 
+      while in the rest of the Resting ECG conditions there are more with the disease than No disease.
+  - If there is Exercise Induced Angina, the patient is more likely to have the disease than not to have it. 
+      In the case of Non-Exercise Induced Angina it is the opposite.
+  - The type of old peak slope seems to be related to the diagnosis. In the Flat category the diagnosis of Disease predominates,
+      in the Upsloping category the No disease and in Downsloping we find a 50/50 of Disease and No disease.
+  - As the number of major vessels increases, it is more likely to have the disease than not to have it.
+  - If the thalassemia status is normal, it is more likely that you are healthy than sick (Disease/No disease ratio lower than 1), 
+      but in other cases the ratio is higher than 1 and you are more likely to have the disease.
+
+
+
+
+#### 6.2. Diagnosis x continuous variables.
+
+# Column histogram plots #
+
+```{r}
+# We put the names of continuous variables to plot against on a list
+numeric_cols <- c("age", "chol", "thalach", "oldpeak", "trestbps")
+
+# Then, create an empty list to store the graphics
+plots <- list()
+
+# Loop through each variable and create the plot
+for (v in numeric_cols[1:4]) {
+  p <- ggplot(heartd_imputed, aes_string(x=paste0("heartd_imputed$", v), color="heartd_imputed$num")) +
+    geom_histogram(fill="white", alpha=0.5, position="identity") +
+    geom_density() +
+    ggtitle(paste0(v, " vs condition")) +
+    xlab(v) +
+    scale_color_discrete(name = "Disease condition") +
+    theme(legend.position = "none")
+  plots[[v]] <- p
+}
+
+p <- ggplot(heartd_imputed, aes_string(x=paste0("heartd_imputed$", numeric_cols[5]), color="heartd_imputed$num")) +
+  geom_histogram(binwidth = 1, fill="white", alpha=0.5, position="identity") +
+  geom_density() +
+  ggtitle(paste0(numeric_cols[5], " vs condition")) +
+  xlab(numeric_cols[5]) +
+  scale_color_discrete(name = "", labels = c("Disease", "No disease")) +
+  theme(legend.position = "bottom")
+plots[[numeric_cols[5]]] <- p
+
+
+
+# Merge all graphics into a single image
+suppressWarnings(grid.arrange(grobs=plots, ncol=3)) 
+```
+
+# Density histogram plots #
+
+```{r}
+# Create a new empty list to store the graphics
+plots_density <- list()
+
+# Loop through each variable and create the plot
+for (v in numeric_cols[1:4]) {
+  p <- ggplot(heartd_imputed, aes_string(x=paste0("heartd_imputed$", v), color="heartd_imputed$num")) +
+    geom_density(fill="white", alpha=0.5, position="identity") +
+    geom_density() +
+    ggtitle(paste0(v, " vs condition")) +
+    xlab(v) +
+    scale_color_discrete(name = "Disease condition") +
+    theme(legend.position = "none")
+  plots_density[[v]] <- p
+}
+
+p <- ggplot(heartd_imputed, aes_string(x=paste0("heartd_imputed$", numeric_cols[5]), color="heartd_imputed$num")) +
+  geom_density(fill="white", alpha=0.5, position="identity") +
+  geom_density() +
+  ggtitle(paste0(numeric_cols[5], " vs condition")) +
+  xlab(numeric_cols[5]) +
+  scale_color_discrete(name = "", labels = c("Disease", "No disease")) +
+  theme(legend.position = "bottom")
+plots_density[[numeric_cols[5]]] <- p
+
+# Merge all graphics into a single image
+suppressWarnings(grid.arrange(grobs=plots_density, ncol=3)) 
+```
+
+# Violin plots #
+
+```{r}
+# Create a new empty list to store the graphics
+plots_violin <- list()
+
+# Loop through each variable and create the plot
+for (v in numeric_cols) {
+  p <- ggplot(heartd_imputed, aes(x=num, y=.data[[v]], fill=num)) +
+    geom_violin() +
+    ggtitle(paste0(v, " vs condition")) +
+    xlab("") +
+    ylab(v) +
+    scale_fill_discrete(name = "", labels = c("No disease", "Disease")) +
+    theme(legend.position = "none")
+  plots_violin[[v]] <- p
+}
+
+# Merge all graphics into a single image
+grid.arrange(grobs=plots_violin, ncol=3)
+
+```
+
+First sight conclusions of the "Diagnosis" x Continuous Variables comparative:
+
+  -More cases of disease can be seen as age increases, highlighting a peak on the disease diagnosis around 60 years.
+  
+  -Diagnosis does not seem to have a strong correlation with cholesterol, but as cholesterol levels rise,
+    cases of disease seem to rise slightly.
+    
+  -Higher values of the maximum heart rate seem to be related with the No disease diagnose, while if the 
+    maximum heart rate is low then it is more likely to present the Disease diagnose.
+    
+  -Most healthy patients tend to have an old peak equal to 0, while with higher values the patients 
+    are more likely to present the disease.
+    
+  -The diagnosis appears to be uncorrelated to resting blood pressure.
+
+
+# 2 Difference in mortality rates in hospitalized COVID-19 patients 
+Using the supplementary material from the [Difference in mortality rates in hospitalized COVID-19 patients identified by cytokine profile clustering using a machine learning approach: An outcome prediction alternative](https://www.frontiersin.org/articles/10.3389/fmed.2022.987182/full), perform the following tasks
+
+## Reproduce Figure 1 from the publication
+
+To reproduce this figure, we have to take into account several things about the XLSX table that it provides us:
+
+* BMI : refers to Body mass index
+* NI: not indicated
+* ICU :  intensive care unit
+* ARDS: acute respiratory distress syndrome
+
+We first inspect this xlsx files to see the missing values, wrong annotations or repeated rows.We have seen several characteristics on the data frames once we opened them in excel:
+
+* Some rows are repeated
+* The missing values are annotated as NI
+* In the second data frame, there are more that one record per cytokyne
+
+
+```{r}
+# open the xlsx files
+demographic_data <-read.xlsx("data2/Table_1.xlsx", startRow = 2, colNames = TRUE, na.strings = c("NI"," "))
+cytokine_data <-read.xlsx("data2/Table_2.xlsx", startRow = 2, colNames = TRUE, na.strings = c("NI", "ND"), fillMergedCells = TRUE)
+
+colnames(cytokine_data)[1]<-"ID"
+
+# return tables without the repeated rows:
+demographic_data <- demographic_data[!duplicated(demographic_data[,"ID"]),]
+demographic_data<- unique(demographic_data)
+
+cytokine_data<- unique(cytokine_data)
+
+
+# rownames:
+row.names(demographic_data)<- demographic_data[,1]
+
+```
+
+Next, we have to take into account there are some rows with values with no sense, so we have to do a clean step in the table 1 (demographic_data):
+
+*  there is a patient, COAG-HSJD-135, whose gender is "72" instead of F or M, so it will be removed, 
+*  patients 	COAG-HSJD-180 and COAG-HSJD-076 have a number in "Admission to ICU" column
+*  COAG-HSJD-190 has a "3" in the "Death" column, instead of Yes or NO. 
+*  COAG-HSJD-102 and COAG-HSJD-057 have a number in "ARDS.Diagnosis.Diagnosis" column instead of Yes or No.
+
+```{r}
+# delete the rows with this mistakes
+rows_to_remove <- c("COAG-HSJD-135", "COAG-HSJD-180", "COAG-HSJD-076", "COAG-HSJD-190 ", "COAG-HSJD-102", "COAG-HSJD-057")  # Note that there is a space in the rowname of "COAG-HSJD-190 "
+demographic_data<- demographic_data[!(row.names(demographic_data)%in% rows_to_remove),]
+
+# We keep only the patients that are in both tables:
+join_data <- semi_join(demographic_data, cytokine_data, by="ID")
+
+```
+
+To represent the different plots of the figure 1, we study: Age, Deaths and Clinical groups. 
+
+```{r echo=TRUE}
+# First, study if there are outliers in the attribute "Age"
+ageboxplot <- ggplot(join_data, aes(y = Age)) +
+  geom_boxplot(fill = "pink") +       
+  ylab ("Age\n(years)") +
+  scale_x_discrete(labels = NULL) +
+  theme_bw()
+
+ageboxplot
+```
+
+We can see that there is no outliers in Age
+
+```{r}
+# Figure 1A
+Figure_1A <-as_grob(~hist(join_data$Age, xlab = "Age (n)", ylab = "Frequency (n)", main = "Age",
+     ylim = c(0, 50), col = "lightblue", border = "black"))
+  # we need this "as_grob" function from the "gridGraphics package to be able to join all the figures in only one. 
+```
+
+
+To reproduce the Figure 1.B and C, we have to do clusters based on the attributes ARDS.Diagnosis, Use.of.AMV and Use.of.NIV:
+
+* G1 = all NO
+* G2 = ARDS.Diagnosis must be NO
+* G3 = Use.of.NIV and ARDS.Diagnosis yes, and Use.of.AMV no
+* G4 = Use.of.AMV and ARDS.Diagnosis yes
+
+
+```{r include=FALSE}
+# initialize a new column in the dataframe to store the Clinical classification for each patient
+join_data$group = NA
+
+
+for (i in 1:nrow(join_data)) {
+  if ( join_data[i,"Use.of.NIV"] == "No" & join_data[i, "Use.of.AMV"] == "No" & join_data[i,"ARDS.Diagnosis"] == "No" ) {
+  join_data[i,"group"] = "G1"
+    } else if ((join_data[i,"ARDS.Diagnosis"] == "No") & (join_data[i,"Use.of.NIV"]  == "Yes" | join_data[i, "Use.of.AMV"] == "Yes")) {
+  join_data[i,"group"] = "G2" 
+    } else if (join_data[i,"Use.of.NIV"] == "Yes" & join_data[i, "Use.of.AMV"] == "No" & join_data[i,"ARDS.Diagnosis"] == "Yes" ) {
+      join_data[i,"group"] = "G3" 
+    } else if ((join_data[i,"ARDS.Diagnosis"] == "Yes" & join_data[i,"Use.of.AMV"]  == "Yes") & (join_data[i, "Use.of.NIV"] == "Yes" | join_data[i, "Use.of.NIV"] == "No")) {
+        join_data[i,"group"] = "G4" }
+}
+
+# Figure 1B
+# create a data frame with 4 columns and 4 rows
+figureB <- data.frame(matrix(ncol = 4, nrow = 4))
+
+# assign column names to the data frame
+colnames(figureB) <- c("Clinical classification", "NIV", "AMV", "ARDS")
+
+# assign values to the data frame
+figureB[1,] <- c("G1", "-", "-", "-")
+figureB[2,] <- c("G2", "-/+", "+/-", "-")
+figureB[3,] <- c("G3", "+", "-", "+")
+figureB[4,] <- c("G4", "-/+", "+", "+")
+
+rownames(figureB) <- c("", " ", "  ", "   ")
+# view the table
+
+
+figure_1B <- (as_grob(grid.arrange(top="Definition of the Clincal Classification",tableGrob(figureB))))
+
+
+# Figure 1C:
+# count the frequency of each group
+group_counts <- as.data.frame(table(join_data$group))
+
+# create the bar plot
+
+Figure_1C<- as_grob(~barplot(group_counts$Freq, 
+        names.arg=group_counts$Var1, 
+        col=c("aquamarine3", "darkgoldenrod1", "darkorchid1", "brown2"), 
+        xlab="Clinical Classification", 
+        ylab="Frequency (n)", 
+        main="Clinical Classification",
+        ylim=c(0,80)))
+ 
+
+# Figure 1D:
+deaths <- as.data.frame(table(join_data$Death))
+Figure_1D <- as_grob(~barplot(deaths$Freq, 
+        names.arg=deaths$Var1, 
+        col=c("aquamarine3", "darkgoldenrod1"), 
+        xlab="Death", 
+        ylab="Frequency (n)", 
+        main="Vital status",
+        ylim=c(0,180)))
+
+```
+```{r}
+# to join all the figures in one: 
+
+figures <- list(Figure_1A, figure_1B, Figure_1D, Figure_1C)
+
+plot_grid(plotlist = figures, labels = c("A", "B", "C", "D")) 
+```
+
+## Reproduce Figure 2 from the publication
+But instead of representing the clusters in the annotation, represent the groups (G1 to G4)
+
+We have to filter the data and have only the same ID of both tables, so we create a new one. First, we can see that in cytokine_data (table 2) we have data of the cytokines from each patient for different days, so we have to calculate the median, as the autors of the paper did.
+```{r echo=TRUE, warning=FALSE}
+# Delete special characters in the column names to avoid future problems
+cytokines <- cytokine_data %>% rename_all(funs(gsub("-","",.)))
+
+#Convert all the columns, except the ID, to numeric
+
+for (i in 2:ncol(cytokines)) {
+cytokines[,i] <- as.numeric(cytokines[,i])
+}
+
+# Determine the median value of each laboratory parameter for each patient,
+# since we have many measurements
+
+cytokines <- cytokines %>% group_by(ID) %>% 
+  summarise(IL1β = median(IL1β, na.rm = TRUE), IL6 = median(IL6, na.rm = TRUE),
+  IL10 = median(IL10, na.rm = TRUE), IFNɑ = median(IFNɑ, na.rm = TRUE),
+  TNFɑ = median(TNFɑ, na.rm = TRUE), IL8 = median(IL8, na.rm = TRUE),
+  GCSF = median(GCSF, na.rm = TRUE), IFNγ = median(IFNγ, na.rm = TRUE),
+  CCL3 = median(CCL3, na.rm = TRUE), CXCL10 = median(CXCL10, na.rm = TRUE),
+  CCL2 = median(CCL2, na.rm = TRUE), IL38 = median(IL38, na.rm = TRUE))
+
+# We keep only the patients that are in both tables:
+merge_df <- merge(join_data, cytokines, by="ID")
+
+
+# delete the columns that are not necessary for the task.
+merge_df <- merge_df %>% select(-2:-18)
+
+
+# To delete the rows with NA's
+df_heatmap <- na.omit(merge_df)
+
+# Vector containing the group to which each patient belongs
+Group <- df_heatmap$group
+
+# Set five colors
+library(RColorBrewer)
+colors <- brewer.pal(4, "Set1")# Set1 is a pelette from the slides of class
+
+# Create a vector in which each patient is a color depending on the group to
+# which they belong
+
+group_colors <- ifelse(Group == "G1", colors[1],
+                   ifelse(Group == "G2", colors[2],
+                   ifelse(Group == "G3", colors[3],
+                   ifelse(Group == "G4", colors[4], NA))))
+
+
+# Create a heatmap (run everything at the same time)
+heatmap(as.matrix(t(df_heatmap[,3:14])), cexCol = 0.1, xlab = "Patients", labCol = FALSE, 
+        col = brewer.pal(9,"Oranges"), scale = "column", ColSideColors = group_colors)
+legend("topright",legend=c("G1", "G2", "G3", "G4"),fill=colors)
+legend("bottomleft", legend = c("0.00", "50.0%", "100.0%"), 
+       fill = (brewer.pal(9,"Oranges")[c(1,4,9)]), title = "Relative\nExpression")
+
+
+```
+
+
+## Improve figure 2 of the publication
+Add a second annotation with information of deathm and a third one with information of gender
+
+```{r warning=FALSE, include=FALSE}
+
+# merge two tables to have the column of both tables
+merge_df2 <- merge(join_data, cytokines, by="ID")
+
+# missing values imputation
+merge_df2 <- mice(data = merge_df2, m = 1, method = "pmm", maxit = 50, seed = 500)
+merge_df2 <- complete(merge_df2)
+```
+
+```{r echo=TRUE, warning=FALSE}
+#GROUPS
+#Groups annotation and select colors to groups
+Group <- merge_df2$group
+groups_annotation <- HeatmapAnnotation(Groups=Group, col= list(Groups= c("G1" = "brown2", "G2" = "dodgerblue3", "G3" = "chartreuse3", "G4" = "mediumorchid2" )))
+
+
+#DEATHS
+#Deaths annotation and set colors
+deaths <- merge_df2$Death
+deaths_annotation <-HeatmapAnnotation(Deaths = deaths, col= list(Deaths= c("Yes" = " gray30", "No" = "gray88")))
+
+
+#GENDER
+##There is a record "COAG-HSJD-017" which have a wrong gender value "F " instead of "F", we should change it)
+merge_df2$Gender <- replace(merge_df2$Gender, merge_df2$Gender=="F ", "F")
+
+#Gender annotation and set colors
+gender <- merge_df2$Gender
+gender_annotation <- HeatmapAnnotation(Gender=gender, col= list(Gender= c("M" = "darkorchid3", "F" = "aquamarine1")))
+
+Heatmap(scale(t(merge_df2[,20:31])), name= "Relative\nexpression", show_column_names = FALSE, column_title = "Patients", column_title_side= "bottom" , show_heatmap_legend = TRUE, top_annotation = c(groups_annotation, deaths_annotation, gender_annotation), col = brewer.pal(9,"Oranges"),heatmap_legend_param = list(title = "Relative\nexpression" ))
+
+```
+
+# session info {.unnumbered}
+
+```{r, results='asis',  echo=FALSE, message=FALSE }
+sessionInfo()
+```
+
